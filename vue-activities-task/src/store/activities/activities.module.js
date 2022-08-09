@@ -71,7 +71,8 @@ export const activities = {
         ],
         completedActivities: [],
         bookedActivities: [],
-        bookNowActivities: []
+        bookNowActivities: [],
+        selectedActivity: null
     },
     getters: {
         fetchActivities: state => state.allActivities
@@ -91,6 +92,24 @@ export const activities = {
             state.bookNowActivities = activitiesList.filter(item => item.state === 0).length
             state.bookedActivities = activitiesList.filter(item => item.state === 1).length
             state.completedActivities = activitiesList.filter(item => item.state === 2).length
+        },
+        setSelectedActivity(state, activity) {
+            state.selectedActivity = activity
+            state.selectedActivity.isEdit = !state.selectedActivity.isEdit  
+        },
+        setActivityName(state, value) {
+            state.selectedActivity.name = value
+        },
+        removeActivity(state, activity) {
+            state.allActivities.map(item => {
+                if (item.activities && item.activities.length) {
+                    item.activities.forEach((element, i) => {
+                        if (activity.id === element.id && activity.name === element.name && activity.state === element.state) {
+                            item.activities.splice(i, 1)
+                        }
+                    })
+                }
+            })
         }
     },
     actions: {}

@@ -9,33 +9,18 @@
             <transition name="slide">
                 <div v-if="isShowActivities" class="main-block__content">
                     <div class="chart-block">
-                        <apexchart type="donut" :options="options" :series="series"></apexchart>
+                        <ApexChart type="donut" :options="options" :series="series" />
                     </div>
                     <div class="activities-block">
-                        <div class="activities-months">
-                            <div class="text-center" v-for="(item, index) in fetchActivities" :key="index">
-                                <span class="month">{{item.month}}</span>
-                                <div v-for="(activity, i) in item.activities" :key="i">
-                                    <div :class="getBorderColor(activity.state)"></div>
-                                </div>
-                            </div>
-                        </div>
+                        <MonthCalendar :data="allActivities" />
                         <div v-for="(item, index) in fetchActivities" :key="index">
                             <div class="activities-item" v-for="(activity, i) in item.activities" :key="i">
                                 <p v-if="!activity.isEdit" class="activities-item__name">{{activity.name}}</p>
-                                <input v-if="activity.isEdit" v-model="activity.name"  @keyup.enter="hideInput(activity)" />
+                                <input v-if="activity.isEdit" v-model="activityName" @keyup.enter="hideInput(activity)" />
                                 <div class="flex-center" style="width: 30%; justify-content: end">
-                                    <div v-if="activity.state === 0" class="flex-center state-info">
-                                        <img src="@/assets/book-now.svg" class="state-icon" alt="booknow icon" width="24" />
-                                        <span style="color: blueviolet; font-weight: 600;">Book now</span>
-                                    </div>
-                                    <div v-else-if="activity.state === 1" class="flex-center state-info">
-                                        <img src="@/assets/booked-icon.svg" class="state-icon" alt="booked icon" width="24" />
-                                        <span style="color: blue; font-weight: 600;">Booked</span>
-                                    </div>
-                                    <div v-else class="flex-center state-info">
-                                        <img src="@/assets/completed-icon.svg" class="state-icon" alt="completed icon" width="24" />
-                                        <span style="color: green; font-weight: 600;">Completed</span>
+                                    <div class="flex-center state-info">
+                                        <img :src="require('@/assets/' + getActivitySate(activity.state) + '.svg')" class="state-icon" :alt="getActivitySate(activity.state)" width="24" />
+                                        <span :class="getActivitySate(activity.state)">{{getActivitySate(activity.state)}}</span>
                                     </div>
                                     <div class="actions">
                                         <button @click="activity.isOpenActions = !activity.isOpenActions" class="btn-actions">
@@ -43,8 +28,8 @@
                                         </button>
                                         <div v-if="activity.isOpenActions" class="actions-list">
                                             <ul>
-                                                <li @click="activity.isEdit = !activity.isEdit">Edit</li>
-                                                <li @click="removeActivity(activity, i)">Delete</li>
+                                                <li @click="editActivity(activity)">Edit</li>
+                                                <li @click="remove(activity)">Delete</li>
                                             </ul>
                                         </div>
                                     </div>
@@ -60,9 +45,13 @@
 
 <script>
 import { mapGetters, mapMutations, mapState } from 'vuex';
+// components
+import ApexChart from '@/components/ApexChart.vue';
+import MonthCalendar from '@/components/MonthCalendar.vue';
 
 export default {
     name: "ActivitiesList",
+    components: { ApexChart, MonthCalendar },
     data() {
         return {
             isShowActivities: true,
@@ -110,8 +99,17 @@ export default {
             allActivities: state => state.activities.allActivities,
             completedActivities: state => state.activities.completedActivities,
             bookedActivities: state => state.activities.bookedActivities,
-            bookNowActivities: state => state.activities.bookNowActivities
-        })
+            bookNowActivities: state => state.activities.bookNowActivities,
+            selectedActivity: state => state.activities.selectedActivity
+        }),
+        activityName: {
+            get() {
+                return this?.selectedActivity?.name
+            },
+            set(value) {
+                this.setActivityName(value)
+            }
+        }
     },
     created() {
         this.fetchActivities
@@ -120,15 +118,16 @@ export default {
     },
     methods: {
         ...mapMutations({
-            setActivities: 'activities/setActivities'
+            setActivities: 'activities/setActivities',
+            removeActivity: 'activities/removeActivity',
+            setSelectedActivity: 'activities/setSelectedActivity',
+            setActivityName: 'activities/setActivityName'
         }),
-
         getChartData() {
             this.setActivities()
             this.series = [this.completedActivities, this.bookedActivities, this.bookNowActivities]
         },
-
-        getBorderColor(value) {
+        getActivitySate(value) {
             switch(value) {
                 case 0: {
                     return 'book-now'    
@@ -141,20 +140,13 @@ export default {
                 }
             }
         },
-
-        removeActivity(activity, index) {
-            this.allActivities.map(item => {
-                if (item.activities && item.activities.length) {
-                    item.activities.forEach((element, i) => {
-                        if (i === index && activity.name === element.name && activity.state === element.state) {
-                            item.activities.splice(i, 1)
-                        }
-                    })
-                }
-            })
+        remove(activity) {
+            this.removeActivity(activity)
             this.getChartData()
         },
-
+        editActivity(activity) {
+            this.setSelectedActivity(activity)
+        },  
         hideInput(item) {
             item.isEdit = false
         }
@@ -238,20 +230,13 @@ button {
     margin: 0 20px;
 }
 
-.activities-item,
-.activities-months {
+.activities-item {
     display: flex;
     justify-content: space-between;
     border: 1px solid #ccc;
     border-radius: 10px;
     padding: 25px 16px;
     margin: 10px 0;
-}
-.month {
-    color: #A9C3DB;
-    font-weight: 600;
-    margin-bottom: 10px;
-    display: block;
 }
 .activities-item {
     height: 80px;
@@ -265,31 +250,20 @@ button {
 .state-info {
     width: 160px;
 }
+.state-info span {
+    font-weight: 600;
+}
+.state-info .completed {
+    color: #66B25C;
+}
+.state-info .booked {
+    color: #13599E;
+}
+.state-info .book-now {
+    color: #A3C8ED;
+}
 .state-icon {
     margin-right: 8px;
-}
-.completed,
-.booked,
-.book-now {
-    margin-bottom: 6px;
-}
-.completed::after,
-.booked::after,
-.book-now::after {
-    display: block;
-    content: '';
-    width: 60px;
-    height: 5px;
-    border-radius: 5px;
-}
-.completed::after {
-    background-color: #66B25C;
-}
-.booked::after {
-    background-color: #13599E;
-}
-.book-now::after {
-    background-color: #A3C8ED;
 }
 
 .slide-enter-active {
